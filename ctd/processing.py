@@ -5,6 +5,8 @@ Processing module
 import numpy as np
 import numpy.ma as ma
 import pandas as pd
+from scipy import signal as sign
+from scipy.stats import linregress
 
 from pandas_flavor import register_dataframe_method, register_series_method
 
@@ -268,3 +270,83 @@ def movingaverage(df, window_size=48):
     else:
         new_df = df.apply(_movingaverage, window_size=window_size)
     return new_df
+
+
+@register_series_method
+@register_dataframe_method
+def longestpressure(df, thresh=2):
+    """
+    Select the longest continuoes segment in the dataframe based on the pressure.
+    
+    Inputs
+    ------
+    df  : pandas.DataFrame
+        CTD cast to select.
+    thresh  : int
+        TODO --> 
+    """
+    df_new = df.copy()
+    
+    i = np.where(abs(np.gradient(df_new.index))>thresh)[0]
+    df_new.iloc[i] = np.nan
+
+    df_new['group'] = df_new.isnull().all(axis=1).cumsum()
+    groups = df_new.groupby('group')
+    gcount = groups.count()
+    gcount1 = gcount[gcount==gcount.max()].dropna()
+    df_new = groups.get_group(gcount1.index.values[0]).dropna()
+    
+    return df_new
+
+def _local_slope(value):
+    import scipy.signal as sign
+    from scipy.stats import linregress
+    
+    d = value - sign.detrend(value.values)
+    slope = linregress(np.arange(d.size), d)[0]
+    return slope
+
+
+@register_series_method
+@register_dataframe_method
+def downcast_upcast(dataref, data, winsize=500, direction='down', thresh=0.02):
+    df = pd.DataFrame(dataref)
+    df = pd.DataFrame(data.index)
+    # -- extend dataframe to account for blackman window size -- #
+    index = df.index
+    bsize = np.floor(winsize/2)
+    if winsize % 2 == 0:
+        reindex = np.arange(index[0]-bsize,index[-1]+bsize)
+    else:
+        reindex = np.arange(index[0]-bsize,index[-1]+1+bsize)
+
+    'Extrapol.'
+    filt_na =  df.reindex(index=reindex)
+    filt_na =  filt_na.interpolate(limit_direction='both')
+
+    trend = filt_na.rolling(winsize, center=True).apply(_local_slope)
+    trend = trend.dropna()
+    # i = np.where((trend>0) & (np.gradient(trend)>0))[0]
+    if direction=='down':
+        i = np.where((trend>thresh))[0]
+        dataaux = data.iloc[i]
+    elif direction=='up':
+        i = np.where((trend<-thresh))[0]
+        dataaux = data.iloc[i]
+    else:
+        raise IOError('wrong  direction input')
+    return dataaux
+
+@register_series_method
+@register_dataframe_method
+def loopedit(df):
+    df_new = df.copy()
+    
+    try:
+        flag = df_new['dz/dtM'].values>0
+        df_new = df_new.iloc[flag,:]
+    except:
+        flag = np.hstack([1,np.diff(df_new.index.values)])>0
+        df_new = df_new.iloc[flag,:]
+        
+    return df_new
