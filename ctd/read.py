@@ -362,7 +362,7 @@ def from_edf(fname):
     return df
 
 
-def from_cnv(fname):
+def from_cnv(fname, prname=None):
     """
     DataFrame constructor to open Seabird CTD CNV-ASCII format.
 
@@ -390,11 +390,14 @@ def from_cnv(fname):
         widths=[11] * len(metadata["names"]),
     )
     f.close()
-
+    
     prkeys = ["prM ", "prE", "prDM", "pr50M", "pr50M1", "prSM", "prdM", "pr", "depSM"]
     prkey = [key for key in prkeys if key in df.columns]
-    if len(prkey) != 1:
-        raise ValueError(f"Expected one pressure/depth column, got {prkey}.")
+    if (len(prkey) != 1) and (prname == None):
+        raise ValueError(f"Expected one pressure/depth column, got {prkey}. Prove a valid name `prname` to solve this.")
+    elif prname:
+        prkey = prname
+    
     df.set_index(prkey, drop=True, inplace=True)
     df.index.name = "Pressure [dbar]"
     if prkey == "depSM":
