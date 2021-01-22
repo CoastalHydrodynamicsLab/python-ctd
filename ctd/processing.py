@@ -275,33 +275,45 @@ def movingaverage(df, window_size=48):
 @register_series_method
 @register_dataframe_method
 def longestpressure(df, thresh=2):
-    """
-    Select the longest continuoes segment in the dataframe based on the pressure.
-    
-    Inputs
-    ------
-    df  : pandas.DataFrame
-        CTD cast to select.
-    thresh  : int
-        TODO --> 
-    """
-    df_new = df.copy()
-    
-    i = np.where(abs(np.gradient(df_new.index))>thresh)[0]
-    df_new.iloc[i] = np.nan
+    """Separates the dataframe based into pieces based on a pressure gradient
+    threshold and select the longest one.
 
+    Parameters
+    ----------
+    data : pandas DataFrame
+        Pandas dataframe with the ctd data.
+        Notice the index must be the pressure values.
+    thresh : integer or float
+        gradient threshold used to separate the dataframe
+
+    Returns
+    -------
+    pandas DataFrame
+        DataFrame with the data selected with the longest pressure vector
+
+    """
+
+    df_new = df.copy()
+
+    # -- find cut positions where the pressure surpasses a given threshold -- #
+    i = np.where(abs(np.gradient(df_new.index))>thresh)[0]
+    df_new.iloc[i] = np.nan  # substitute values in cut positions with nan
+
+
+    # -- identify positions with nan and give a integer id for each section -- #
     df_new['group'] = df_new.isnull().all(axis=1).cumsum()
     groups = df_new.groupby('group')
-    gcount = groups.count()
-    gcount1 = gcount[gcount==gcount.max()].dropna()
+    gcount = groups.count()  # counting the number of elements in each group
+    gcount1 = gcount[gcount==gcount.max()].dropna()  # select the largest one
+    # -- select the largest group based on the integer id -- #
     df_new = groups.get_group(gcount1.index.values[0]).dropna()
-    
+
     return df_new
 
 def _local_slope(value):
     import scipy.signal as sign
     from scipy.stats import linregress
-    
+
     d = value - sign.detrend(value.values)
     slope = linregress(np.arange(d.size), d)[0]
     return slope
@@ -341,12 +353,12 @@ def downcast_upcast(dataref, data, winsize=500, direction='down', thresh=0.02):
 @register_dataframe_method
 def loopedit(df):
     df_new = df.copy()
-    
+
     try:
         flag = df_new['dz/dtM'].values>0
         df_new = df_new.iloc[flag,:]
     except:
         flag = np.hstack([1,np.diff(df_new.index.values)])>0
         df_new = df_new.iloc[flag,:]
-        
+
     return df_new
