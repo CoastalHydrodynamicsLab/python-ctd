@@ -119,12 +119,21 @@ def _bindata(series, delta, method):
     """Average the data into bins of the size `delta`."""
     start = np.ceil(series.index[0])
     stop = np.floor(series.index[-1])
-    new_index = np.arange(start, stop, delta)
-    binned = pd.cut(series.index, bins=new_index)
+    new_index = np.arange(start, stop, delta)  # reindex the  dataframe
+
     if method == "average":
+        # cut the series in intervals based on new_index
+        # if series = [1,2,3,4,5,6] and  new_index=[0,2], cut will Separates
+        # the series into binned=[1,2],[3,4],[5,6] (in a smarter way)
+        binned = pd.cut(series.index, bins=new_index)
+
+        # calcualte the average
         new_series = series.groupby(binned).mean()
+
+        # reindex
         new_series.index = new_index[:-1] + delta / 2
     elif method == "interpolate":
+        # simple interpolation
         data = np.interp(new_index, series.index, series)
         return pd.Series(data, index=new_index, name=series.name)
     else:
