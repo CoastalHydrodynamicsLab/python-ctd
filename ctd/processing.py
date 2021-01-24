@@ -5,8 +5,6 @@ Processing module
 import numpy as np
 import numpy.ma as ma
 import pandas as pd
-from scipy import signal as sign
-from scipy.stats import linregress
 
 from pandas_flavor import register_dataframe_method, register_series_method
 
@@ -157,16 +155,15 @@ def _despike(series, n1, n2, block, keep):
 
     data = series.values.astype(float).copy()
     
-    if n1:
-        roll = _rolling_window(data, block)
-        roll = ma.masked_invalid(roll)
-        std = n1 * roll.std(axis=1)
-        mean = roll.mean(axis=1)
-        # Use the last value to fill-up.
-        std = np.r_[std, np.tile(std[-1], block - 1)]
-        mean = np.r_[mean, np.tile(mean[-1], block - 1)]
-        mask = np.abs(data - mean.filled(fill_value=np.NaN)) > std.filled(fill_value=np.NaN)
-        data[mask] = np.NaN
+    roll = _rolling_window(data, block)
+    roll = ma.masked_invalid(roll)
+    std = n1 * roll.std(axis=1)
+    mean = roll.mean(axis=1)
+    # Use the last value to fill-up.
+    std = np.r_[std, np.tile(std[-1], block - 1)]
+    mean = np.r_[mean, np.tile(mean[-1], block - 1)]
+    mask = np.abs(data - mean.filled(fill_value=np.NaN)) > std.filled(fill_value=np.NaN)
+    data[mask] = np.NaN
 
     # Pass two recompute the mean and std without the flagged values from pass
     # one and removed the flagged data.
@@ -189,7 +186,7 @@ def _despike(series, n1, n2, block, keep):
 
 @register_series_method
 @register_dataframe_method
-def despike(df, n1=None, n2=20, block=100, keep=0):
+def despike(df, n1=2, n2=20, block=100, keep=0):
     """
     Wild Edit Seabird-like function.  Passes with Standard deviation
     `n1` and `n2` with window size `block`.
@@ -271,151 +268,3 @@ def movingaverage(df, window_size=48):
     else:
         new_df = df.apply(_movingaverage, window_size=window_size)
     return new_df
-
-##################################################################################################
-
-@register_series_method
-@register_dataframe_method
-def longestpressure(df, thresh=2):
-    """Separates the dataframe based into pieces based on a pressure gradient
-    threshold and select the longest one.
-
-    Parameters
-    ----------
-    data : pandas DataFrame
-        Pandas dataframe with the ctd data.
-        Notice the index must be the pressure values.
-    thresh : integer or float
-        gradient threshold used to separate the dataframe
-
-    Returns
-    -------
-    pandas DataFrame
-        DataFrame with the data selected with the longest pressure vector
-
-    """
-    # TODO: adicionar flag para acionar o index, caso este seja pressure, ou uma coluna de pressure
-    df_new = df.copy()
-
-    # -- find cut positions where the pressure surpasses a given threshold -- #
-    i = np.where(abs(np.gradient(df_new.index))>thresh)[0]
-    df_new.iloc[i] = np.nan  # substitute values in cut positions with nan
-
-    # -- identify positions with nan and give a integer id for each section -- #
-    df_new['group'] = df_new.isnull().all(axis=1).cumsum()
-    groups = df_new.groupby('group')
-    gcount = groups.count()  # counting the number of elements in each group
-    gcount1 = gcount[gcount==gcount.max()].dropna()  # select the largest one
-    # -- select the largest group based on the integer id -- #
-    df_new = groups.get_group(gcount1.index.values[0]).dropna()
-
-    return df_new
-
-
-
-def _local_slope(value):
-    import scipy.signal as sign
-    from scipy.stats import linregress
-
-    d = value - sign.detrend(value.values)
-    slope = linregress(np.arange(d.size), d)[0]
-    return slope
-
-
-@register_series_method
-@register_dataframe_method
-def downcast_upcast(data, winsize=500, direction='down', thresh=0.02):
-    """
-        TODO - ADD DOCSTRING
-    """
-    df = pd.DataFrame(data.index)
-    df = pd.DataFrame(data.index)
-    # -- extend dataframe to account for blackman window size -- #
-    index = df.index
-    bsize = np.floor(winsize/2)
-    if winsize % 2 == 0:
-        reindex = np.arange(index[0]-bsize,index[-1]+bsize)
-    else:
-        reindex = np.arange(index[0]-bsize,index[-1]+1+bsize)
-
-    # 'Extrapol.'
-    filt_na =  df.reindex(index=reindex)
-    filt_na =  filt_na.interpolate(limit_direction='both')
-
-    trend = filt_na.rolling(winsize, center=True).apply(_local_slope)
-    trend = trend.dropna()
-    # i = np.where((trend>0) & (np.gradient(trend)>0))[0]
-    if direction=='down':
-        i = np.where((trend>thresh))[0]
-        dataaux = data.iloc[i]
-    elif direction=='up':
-        i = np.where((trend<-thresh))[0]
-        dataaux = data.iloc[i]
-    else:
-        raise IOError('wrong  direction input')
-    return dataaux
-
-
-@register_series_method
-@register_dataframe_method
-def loopedit(df):
-    """
-    Remove values with negative pressure gradient.
-
-    Credits
-    -------
-    Function extracted from an old OceanLab version:
-                  https://github.com/iuryt/OceanLab
-    """
-    df_new = df.copy()
-
-    try:
-        flag = df_new['dz/dtM'].values>0
-        df_new = df_new.iloc[flag,:]
-    except:
-        flag = np.hstack([1,np.diff(df_new.index.values)])>0
-        df_new = df_new.iloc[flag,:]
-
-    return df_new
-
-
-@register_dataframe_method
-def _bindata2(df, reference='depSM', delta=1.):
-    """
-        TODO - ADD DOCSTRING
-    """
-    df_new = df.copy()
-    df_new = df_new.reset_index(drop=False)
-    
-    indd=np.round(df_new[reference].values)
-    binned = df_new.groupby(indd).mean()
-    binned[reference] = binned.index.values
-    return binned
-
-
-@register_dataframe_method
-def despike2(series, n1=None, n2=20):
-    """ In this version of despike, the block argument is computed based on the cast's shape.
-    """
-    shp = series.shape[0]
-    
-    # check the half size
-    if (shp < 105) & (shp > 10):  # perfil for com menos de 105 medidas
-        # if cast has less than 105 and even number observations 
-        if (shp//2)%2 == 0:   
-            # block is defined as the half + 1
-            block = (shp//2)+1
-        else:
-            # if block has les than 105 and odd number of observations, then the block is the half
-            block = shp//2
-    # if cast has more than 105 observations, then the block is precisely 105
-    elif shp >= 105:
-        block = 105
-    else:
-        block = None
-        
-    if block:
-        return despike(series, n1=n1, n2=n2, block=block)
-    else:
-        print('To shallow cast.')
-    
