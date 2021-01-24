@@ -154,7 +154,6 @@ def _despike(series, n1, n2, block, keep):
     """
 
     data = series.values.astype(float).copy()
-    
     roll = _rolling_window(data, block)
     roll = ma.masked_invalid(roll)
     std = n1 * roll.std(axis=1)
