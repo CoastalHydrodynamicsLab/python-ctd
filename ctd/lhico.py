@@ -13,6 +13,32 @@ from ctd.processing import _rolling_window
 
 from pandas_flavor import register_dataframe_method, register_series_method
 
+
+@register_series_method
+@register_dataframe_method
+def clean_invalid(df, flag='flag'):
+    """ Remove rows where flag is True. Is `flag` is not in the columns, return 
+    the same dataframe.
+    
+    Parameters
+    ----------
+    flag  : str
+        Column used as flag. Default if `flag`.
+    """
+    df_new = df.copy()
+    
+    _meta = df._metadata
+    
+    if flag in df.columns:
+        filtr = (df.flag == False)
+        df_new = df_new[filtr]
+
+    df_new._metadata = _meta
+    
+    return df_new
+
+##############################################################################
+
 @register_series_method
 @register_dataframe_method
 def loopedit2(df):
@@ -34,6 +60,8 @@ def loopedit2(df):
         df_new = df_new.iloc[flag,:]
 
     return df_new
+
+##############################################################################
 
 @register_series_method
 @register_dataframe_method
@@ -73,6 +101,8 @@ def longest_pressure(df, thresh=2, indexname='Pressure [dbar]'):
 
     return df_new
 
+##############################################################################
+
 @register_series_method
 @register_dataframe_method
 def downup_cast(df, winsize=500, thresh=0.02):
@@ -86,6 +116,8 @@ def downup_cast(df, winsize=500, thresh=0.02):
         
     return df_new
 
+##############################################################################
+
 @register_series_method
 @register_dataframe_method
 def bindata2(df, reference='depSM', delta=1.):
@@ -95,10 +127,14 @@ def bindata2(df, reference='depSM', delta=1.):
     
     return df_new
 
+##############################################################################
+
 @register_dataframe_method
 def check_pump(df, pumpname='pumps'):
     df_new = df.copy()
     return df_new[df_new[pumpname] != 0]
+
+##############################################################################
 
 @register_dataframe_method
 def despike_(df, weight=2):
@@ -125,7 +161,7 @@ def despike_(df, weight=2):
     
     return df_new
 
-#-- auxiliar functions --#
+##############################################################################
 
 def _block_size(shp):
     # check the half size
@@ -144,6 +180,8 @@ def _block_size(shp):
         block = None
         
     return block
+
+##############################################################################
 
 def _despike(series, block=100, weight=2):
     #  weight is a factor that controls the cutoff threshold
@@ -175,6 +213,8 @@ def _despike(series, block=100, weight=2):
 
     return clean
 
+##############################################################################
+
 def _binmov(df, reference='depSM', delta=1.):
     
     indd = np.round(df[reference].values)
@@ -183,10 +223,14 @@ def _binmov(df, reference='depSM', delta=1.):
 
     return binned
 
+##############################################################################
+
 def _local_slope(value):
     d = value - sign.detrend(value.values)
     slope = linregress(np.arange(d.size), d)[0]
     return slope
+
+##############################################################################
 
 def _downcast_upcast(data, winsize=500, direction='down', thresh=0.02):
     """
