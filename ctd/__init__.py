@@ -17,6 +17,14 @@ from .processing import (
 )
 from .read import from_bl, from_btl, from_cnv, from_edf, from_fsi, rosette_summary
 
+from .lhico import (
+    loopedit2, 
+    longest_pressure, 
+    downup_cast, 
+    bindata2, 
+    despike_, 
+    clean_invalid
+)
 
 try:
     from ._version import __version__
