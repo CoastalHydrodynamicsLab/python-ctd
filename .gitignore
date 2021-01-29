@@ -7,3 +7,4 @@
 build/
 ctd/_version.py
 dist/
+ctd/__pycache__
