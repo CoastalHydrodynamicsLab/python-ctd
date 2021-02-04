@@ -87,6 +87,12 @@ def longest_pressure(df, thresh=2, indexname='Pressure [dbar]'):
     # TODO: adicionar flag para acionar o index, caso este seja pressure, ou uma coluna de pressure
     df_new = df.copy()
 
+    # define threshold based on the maximum sampled depth
+    if df.index.max() > 1000:
+        thresh = 4
+    else:
+        thresh = 2
+    
     # -- find cut positions where the pressure surpasses a given threshold -- #
     i = np.where(abs(np.gradient(df_new.index))>thresh)[0]
     df_new.iloc[i] = np.nan  # substitute values in cut positions with nan
