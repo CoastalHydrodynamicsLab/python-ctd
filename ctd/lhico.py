@@ -115,10 +115,10 @@ def downup_cast(df, winsize=500, thresh=0.02):
     
     df_new = df.copy()
     
-    if df_new.shape[0] > winsize:
+    if df_new.shape[0] > 3*winsize:
         df_new = _downcast_upcast(df_new, winsize=winsize, thresh=thresh)
     else:
-        df_new = _downcast_upcast(df_new, winsize=50, thresh=0.012)
+        df_new = _downcast_upcast(df_new, winsize=20, thresh=0.012)
         
     return df_new
 
